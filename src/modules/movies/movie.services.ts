@@ -4,16 +4,22 @@ import { Collection, Document, MongoError } from "mongodb";
 const VECTOR_NAME = "vector_index";
 const VECTOR_PATH = "plot_embedding";
 const COSINE = "cosine";
+const MAX_NUM_CANDIDATES_NUMBER = 10000;
 
-export const getVectorSearchQuery = (limit: number, vector: number[]) => {
+export const getVectorSearchQuery = (vector: number[], year: number) => {
   return {
     $vectorSearch: {
       index: VECTOR_NAME,
       path: VECTOR_PATH,
       similarity: COSINE,
       queryVector: vector,
-      numCandidates: limit,
-      limit: limit,
+      numCandidates: MAX_NUM_CANDIDATES_NUMBER,
+      limit: MAX_NUM_CANDIDATES_NUMBER,
+      filter: {
+        year: {
+          $lt: year,
+        },
+      },
     },
   };
 };
@@ -32,17 +38,12 @@ export const getResults = async (
   year: number
 ): Promise<Movie[]> => {
   try {
-    // GET TOTAL NUMBER OF DOCUMENTS
-    const totalDocuments = await collection.countDocuments();
     // CREATE VECTOR QUERY
-    const vectorSearchQuery = getVectorSearchQuery(totalDocuments, vector);
-    // CREATE FILTER QUERY
-    const query = { year: { $lt: year } };
+    const vectorSearchQuery = getVectorSearchQuery(vector, year);
 
     const results = await collection
       .aggregate([
         vectorSearchQuery,
-        { $match: query },
         {
           $project: {
             title: 1,
